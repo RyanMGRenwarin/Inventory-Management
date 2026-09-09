@@ -1,0 +1,155 @@
+﻿@using InventoryManagement.Domain.Enums
+@using InventoryManagement.Web.ViewModels.Transaction
+@model TransactionListViewModel
+
+@{
+    ViewData["Title"] = "Transactions";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Transactions</h1>
+    @if (User.Identity!.IsAuthenticated)
+    {
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Transaction
+        </a>
+    }
+</div>
+
+<!-- Filter -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form asp-action="Index" method="get" class="row g-3">
+            <div class="col-md-2">
+                <select name="ProductId" class="form-select" asp-items="@(new SelectList(Model.Products, "Id", "Name", Model.Filter.ProductId))">
+                    <option value="">All Products</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="WarehouseId" class="form-select" asp-items="@(new SelectList(Model.Warehouses, "Id", "Name", Model.Filter.WarehouseId))">
+                    <option value="">All Warehouses</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="Type" class="form-select" asp-for="Filter.Type">
+                    <option value="">All Types</option>
+                    <option value="1">Inbound</option>
+                    <option value="2">Outbound</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="StartDate" class="form-control" value="@Model.Filter.StartDate?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <input type="date" name="EndDate" class="form-control" value="@Model.Filter.EndDate?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Transaction List -->
+@if (Model.Transactions.Transactions.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Product</th>
+                    <th>Warehouse</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                    <th>Date</th>
+                    <th>By</th>
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <th>Actions</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var transaction in Model.Transactions.Transactions)
+                {
+                    <tr>
+                        <td>@transaction.Id</td>
+                        <td>@transaction.ProductName</td>
+                        <td>@transaction.WarehouseName</td>
+                        <td>
+                            <span class="badge @(transaction.Type == TransactionType.Inbound ? "bg-success" : "bg-danger")">
+                                @transaction.TypeDisplayName
+                            </span>
+                        </td>
+                        <td>@transaction.Quantity</td>
+                        <td>@transaction.UnitPrice.ToString("C")</td>
+                        <td>@transaction.TotalAmount.ToString("C")</td>
+                        <td>@transaction.TransactionDate.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@transaction.CreatedByUserName</td>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <td>
+                                <form asp-action="Delete" asp-route-id="@transaction.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-danger delete-btn"
+                                            data-title="Delete Transaction"
+                                            data-text="Are you sure you want to delete this transaction? This will reverse stock changes."
+                                            data-confirm-text="Yes, delete it!">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        }
+                        else
+                        {
+                            <td>
+                                <span class="badge bg-secondary">Read Only</span>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <nav aria-label="Transaction pagination">
+        <ul class="pagination justify-content-center">
+            @if (Model.Transactions.HasPreviousPage)
+            {
+                <li class="page-item">
+                    <a class="page-link" asp-action="Index" asp-route-pageNumber="@(Model.Transactions.PageNumber - 1)" asp-route-productId="@Model.Filter.ProductId" asp-route-warehouseId="@Model.Filter.WarehouseId" asp-route-type="@Model.Filter.Type" asp-route-startDate="@Model.Filter.StartDate" asp-route-endDate="@Model.Filter.EndDate">Previous</a>
+                </li>
+            }
+            else
+            {
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+            }
+
+            @for (int i = 1; i <= Model.Transactions.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.Transactions.PageNumber ? "active" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-pageNumber="@i" asp-route-productId="@Model.Filter.ProductId" asp-route-warehouseId="@Model.Filter.WarehouseId" asp-route-type="@Model.Filter.Type" asp-route-startDate="@Model.Filter.StartDate" asp-route-endDate="@Model.Filter.EndDate">@i</a>
+                </li>
+            }
+
+            @if (Model.Transactions.HasNextPage)
+            {
+                <li class="page-item">
+                    <a class="page-link" asp-action="Index" asp-route-pageNumber="@(Model.Transactions.PageNumber + 1)" asp-route-productId="@Model.Filter.ProductId" asp-route-warehouseId="@Model.Filter.WarehouseId" asp-route-type="@Model.Filter.Type" asp-route-startDate="@Model.Filter.StartDate" asp-route-endDate="@Model.Filter.EndDate">Next</a>
+                </li>
+            }
+            else
+            {
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+            }
+        </ul>
+    </nav>
+}
+else
+{
+    <div class="alert alert-info">No transactions found.</div>
+}

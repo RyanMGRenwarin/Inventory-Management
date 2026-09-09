@@ -1,0 +1,116 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Inventory Management</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body data-theme="@(Context.Request.Cookies["Theme"] ?? "light")">
+
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Inventory Management</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Product" asp-action="Index">Products</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Warehouse" asp-action="Index">Warehouses</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Transaction" asp-action="Index">Transactions</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Category" asp-action="Index">Categories</a>
+                                </li>
+                            }
+                        </ul>
+                    <ul class="navbar-nav">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            var fullName = Context.Session.GetString("UserFullName") ?? User.Identity.Name;
+                            var role = Context.Session.GetString("UserRole") ?? "User";
+
+                            <li class="nav-item d-flex align-items-center">
+                                <span class="text-muted me-2">Welcome, <strong>@fullName</strong></span>
+                                <span class="badge bg-info me-2">@role</span>
+
+                                <form asp-area="Auth" asp-controller="Auth" asp-action="Logout" method="post" class="d-inline me-2">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Logout</button>
+                                </form>
+
+                                <button id="themeToggle" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi @(Context.Request.Cookies["Theme"] == "dark" ? "bi-sun" : "bi-moon")"></i>
+                                </button>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="Auth" asp-controller="Auth" asp-action="Login">Login</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="Auth" asp-controller="Auth" asp-action="Register">Register</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; @DateTime.Now.Year - Inventory Management
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/ajax-functions.js" asp-append-version="true"></script>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="~/js/delete-confirm.js" asp-append-version="true"></script>
+
+    <!-- Theme toggle script -->
+    <script>
+            document.getElementById('themeToggle')?.addEventListener('click', function () {
+                var currentTheme = document.body.getAttribute('data-theme');
+                var newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+                document.body.setAttribute('data-theme', newTheme);
+
+                var icon = this.querySelector('i');
+                if (icon) {
+                    icon.className = newTheme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+                }
+
+                document.cookie = "Theme=" + newTheme + ";path=/;max-age=" + (365 * 24 * 60 * 60);
+            });
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

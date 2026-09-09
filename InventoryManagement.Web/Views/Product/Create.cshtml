@@ -1,0 +1,111 @@
+﻿@using InventoryManagement.Web.ViewModels.Product
+@model ProductCreateViewModel
+
+@{
+    ViewData["Title"] = "Create Product";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Create Product</h1>
+    <a asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.Name" class="form-label"></label>
+                        <input asp-for="Product.Name" class="form-control" placeholder="Enter product name" />
+                        <span asp-validation-for="Product.Name" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.SKU" class="form-label"></label>
+                        <input asp-for="Product.SKU" class="form-control" placeholder="Enter SKU" />
+                        <span asp-validation-for="Product.SKU" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Product.Description" class="form-label"></label>
+                <textarea asp-for="Product.Description" class="form-control" rows="3" placeholder="Enter product description"></textarea>
+                <span asp-validation-for="Product.Description" class="text-danger"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.Price" class="form-label"></label>
+                        <input asp-for="Product.Price" class="form-control" placeholder="0.00" step="0.01" />
+                        <span asp-validation-for="Product.Price" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.StockQuantity" class="form-label"></label>
+                        <input asp-for="Product.StockQuantity" class="form-control" placeholder="0" />
+                        <span asp-validation-for="Product.StockQuantity" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.MinimumStockThreshold" class="form-label"></label>
+                        <input asp-for="Product.MinimumStockThreshold" class="form-control" placeholder="5" />
+                        <span asp-validation-for="Product.MinimumStockThreshold" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group mb-3">
+                        <label asp-for="Product.CategoryId" class="form-label"></label>
+                        <select asp-for="Product.CategoryId" class="form-select" asp-items="@(new SelectList(Model.Categories, "Id", "Name"))">
+                            <option value="">Select Category</option>
+                        </select>
+                        <span asp-validation-for="Product.CategoryId" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Create
+                </button>
+                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        // Client-side SKU validation
+        $('#Product_SKU').on('blur', function () {
+            var sku = $(this).val();
+            if (sku) {
+                $.ajax({
+                    url: '@Url.Action("CheckSku", "Product")',
+                    type: 'GET',
+                    data: { sku: sku },
+                    success: function (data) {
+                        if (!data.available) {
+                            $('#Product_SKU').addClass('is-invalid');
+                            $('#Product_SKU').siblings('.text-danger').text('SKU already exists.');
+                        } else {
+                            $('#Product_SKU').removeClass('is-invalid');
+                            $('#Product_SKU').siblings('.text-danger').text('');
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+}

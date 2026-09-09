@@ -1,0 +1,145 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+/* ============================================================
+   THEME VARIABLES
+   ============================================================ */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #212529;
+    --card-bg: #ffffff;
+    --border-color: #dee2e6;
+    --navbar-bg: #ffffff;
+    --footer-bg: #f8f9fa;
+}
+
+[data-theme="dark"] {
+    --bg-color: #1a1a2e;
+    --text-color: #e0e0e0;
+    --card-bg: #16213e;
+    --border-color: #2a2a4a;
+    --navbar-bg: #0f0f1a;
+    --footer-bg: #0f0f1a;
+}
+
+/* ============================================================
+   APPLY THEME VARIABLES
+   ============================================================ */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+    body .navbar {
+        background-color: var(--navbar-bg) !important;
+        border-bottom-color: var(--border-color) !important;
+    }
+
+        body .navbar .nav-link {
+            color: var(--text-color) !important;
+        }
+
+    body .card {
+        background-color: var(--card-bg);
+        border-color: var(--border-color);
+    }
+
+        body .card .card-title,
+        body .card .card-text {
+            color: var(--text-color);
+        }
+
+    body .border-top,
+    body .border-bottom,
+    body .border {
+        border-color: var(--border-color) !important;
+    }
+
+    body .footer {
+        background-color: var(--footer-bg);
+        color: var(--text-color);
+    }
+
+    body .table {
+        color: var(--text-color);
+    }
+
+    body .table-striped > tbody > tr:nth-of-type(odd) {
+        background-color: var(--card-bg);
+    }
+
+    body .table-hover > tbody > tr:hover {
+        background-color: var(--border-color);
+    }
+
+    body .text-muted {
+        color: var(--text-color) !important;
+        opacity: 0.7;
+    }
+
+    body .bg-white {
+        background-color: var(--card-bg) !important;
+    }
+
+    body .bg-light {
+        background-color: var(--bg-color) !important;
+    }
+
+    body .form-control,
+    body .form-select {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+        body .form-control:focus,
+        body .form-select:focus {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+    body .alert-info {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+    body .alert-success {
+        background-color: #1a3a2a;
+        color: #8fdfb4;
+        border-color: #2a5a3a;
+    }
+
+    body .alert-danger {
+        background-color: #3a1a1a;
+        color: #df8f8f;
+        border-color: #5a2a2a;
+    }
+
+    body .alert-warning {
+        background-color: #3a3a1a;
+        color: #dfdf8f;
+        border-color: #5a5a2a;
+    }

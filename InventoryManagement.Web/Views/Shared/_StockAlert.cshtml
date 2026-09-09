@@ -1,0 +1,26 @@
+﻿@using InventoryManagement.Application.DTOs.Product
+
+@model IEnumerable<ProductResponseDto>
+
+@if (Model != null && Model.Any())
+{
+    <div class="alert alert-warning">
+        <h5><i class="bi bi-exclamation-triangle"></i> Low Stock Alert</h5>
+        <ul>
+            @foreach (var product in Model)
+            {
+                <li>
+                    <strong>@product.Name</strong> (SKU: @product.SKU) -
+                    Stock: @product.StockQuantity / Min: @product.MinimumStockThreshold
+                    <span class="badge bg-danger">@((product.MinimumStockThreshold - product.StockQuantity)) units below threshold</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
+else
+{
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> All products are adequately stocked.
+    </div>
+}

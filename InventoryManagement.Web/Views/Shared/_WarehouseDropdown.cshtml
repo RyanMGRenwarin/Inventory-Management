@@ -1,0 +1,16 @@
+﻿@using InventoryManagement.Application.DTOs.Warehouse
+
+@model IEnumerable<WarehouseResponseDto>
+
+<select class="form-select" id="warehouseSelect" name="WarehouseId">
+    <option value="">Select Warehouse...</option>
+    @if (Model != null)
+    {
+        @foreach (var warehouse in Model)
+        {
+            <option value="@warehouse.Id">
+                @warehouse.Name - @warehouse.Location (@warehouse.CurrentOccupancy/@warehouse.Capacity)
+            </option>
+        }
+    }
+</select>
