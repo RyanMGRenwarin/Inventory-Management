@@ -5,6 +5,7 @@ using InventoryManagement.Web.Filters;
 using InventoryManagement.Web.ViewModels.Product;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
 
 namespace InventoryManagement.Web.Controllers
 {
@@ -114,8 +115,36 @@ namespace InventoryManagement.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(ProductCreateViewModel viewModel, CancellationToken cancellationToken = default)
         {
+            // Remove error binding default
+            ModelState.Remove("Product.Price");
+
+            // Retrieve value from PriceRaw
+            var priceRaw = Request.Form["PriceRaw"].ToString();
+            //viewModel.PriceRaw = priceRaw;
+
+            // Validate: Check if Price is empty or Price is not in valid range (0.01 to 999,999.99)
+            if (string.IsNullOrWhiteSpace(priceRaw))
+            {
+                ModelState.AddModelError("PriceRaw", "Price is required");
+            }
+            else
+            {
+                viewModel.Product.Price = ParseDecimal(priceRaw);
+
+                if (viewModel.Product.Price < 0.01m || viewModel.Product.Price > 999999.99m)
+                {
+                    ModelState.AddModelError("PriceRaw", "Price must be between 0.01 and 999,999.99");
+                }
+            }
+
             if (!ModelState.IsValid)
             {
+                
+
+                // Reload categories
+                viewModel.Categories = await _categoryService.GetAllCategoriesAsync(cancellationToken);
+
+                viewModel.PriceRaw = priceRaw;
                 return View(viewModel);
             }
 
@@ -140,12 +169,16 @@ namespace InventoryManagement.Web.Controllers
             catch (InvalidOperationException ex)
             {
                 ModelState.AddModelError(string.Empty, ex.Message);
+                viewModel.Categories = await _categoryService.GetAllCategoriesAsync(cancellationToken);
+                viewModel.PriceRaw = priceRaw;
                 return View(viewModel);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating product");
                 ModelState.AddModelError(string.Empty, "An error occurred while creating the product.");
+                viewModel.Categories = await _categoryService.GetAllCategoriesAsync(cancellationToken);
+                viewModel.PriceRaw = priceRaw;
                 return View(viewModel);
             }
         }
@@ -181,11 +214,14 @@ namespace InventoryManagement.Web.Controllers
                         Name = product.Name,
                         SKU = product.SKU,
                         Description = product.Description,
-                        Price = product.Price,
+                        Price = product.Price, /*Save Price as decimal for validation,
+                                                 but will use PriceRaw for input/output */
                         StockQuantity = product.StockQuantity,
                         MinimumStockThreshold = product.MinimumStockThreshold,
                         CategoryId = product.CategoryId
                     },
+                    // Fill PriceRaw with format that can be parsed (dot)
+                    PriceRaw = product.Price.ToString(CultureInfo.InvariantCulture),
                     Categories = categories,
                     IsAuthenticated = true,
                     UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value
@@ -211,41 +247,46 @@ namespace InventoryManagement.Web.Controllers
         [HttpPost]
         [Route("Edit/{id}")]
         [AuthorizeRole(UserRole.Admin)]
-        [ServiceFilter(typeof(ValidationActionFilter))]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, ProductEditViewModel viewModel, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> Edit(
+            int id,
+            [FromForm] ProductEditViewModel viewModel,
+            CancellationToken cancellationToken = default)
         {
-            var priceRaw = Request.Form["Product.Price"].FirstOrDefault();
-            var priceRaw2 = Request.Form["Price"].FirstOrDefault();
+            // Remove error binding default for Price
+            ModelState.Remove("Product.Price");
 
-            _logger.LogWarning("===== DEBUG PRICE =====");
-            _logger.LogWarning($"Price from Form (Product.Price): {priceRaw}");
-            _logger.LogWarning($"Price from Form (Price): {priceRaw2}");
-            _logger.LogWarning($"ViewModel.Product.Price: {viewModel.Product.Price}");
-            _logger.LogWarning($"ModelState.IsValid: {ModelState.IsValid}");
+            // Retrieve value from PriceRaw (string)
+            var priceRaw = Request.Form["PriceRaw"].ToString();
+
+            // Validate: Check if Price is empty or Price is not in valid range (0.01 to 999,999.99)
+            if (string.IsNullOrWhiteSpace(priceRaw))
+            {
+                ModelState.AddModelError("PriceRaw", "Price is required");
+            }
+            else
+            {
+                viewModel.Product.Price = ParseDecimal(priceRaw);
+
+                if (viewModel.Product.Price < 0.01m || viewModel.Product.Price > 999999.99m)
+                {
+                    ModelState.AddModelError("PriceRaw", "Price must be between 0.01 and 999,999.99");
+                }
+            }
 
             if (id != viewModel.Product.Id)
-            {
                 return NotFound();
-            }
 
             if (!ModelState.IsValid)
             {
+                viewModel.Categories = await _categoryService.GetAllCategoriesAsync(cancellationToken);
+                // Return PriceRaw that has been entered by user to the form
+                viewModel.PriceRaw = priceRaw;
                 return View(viewModel);
-            }
-
-            foreach (var key in ModelState.Keys)
-            {
-                var entry = ModelState[key];
-                if (entry?.Errors.Count > 0)
-                {
-                    _logger.LogWarning($"ModelState Error - {key}: {string.Join(", ", entry.Errors.Select(e => e.ErrorMessage))}");
-                }
             }
 
             try
             {
-                // Mapping from ViewModel to DTO
                 var updateDto = new ProductUpdateDto
                 {
                     Id = viewModel.Product.Id,
@@ -262,15 +303,12 @@ namespace InventoryManagement.Web.Controllers
                 TempData["SuccessMessage"] = $"Product '{result.Name}' updated successfully.";
                 return RedirectToAction(nameof(Index));
             }
-            catch (InvalidOperationException ex)
-            {
-                ModelState.AddModelError(string.Empty, ex.Message);
-                return View(viewModel);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating product: {ProductId}", viewModel.Product.Id);
+                _logger.LogError(ex, "Error updating product: {ProductId}", id);
                 ModelState.AddModelError(string.Empty, "An error occurred while updating the product.");
+                viewModel.Categories = await _categoryService.GetAllCategoriesAsync(cancellationToken);
+                viewModel.PriceRaw = priceRaw; // Return PriceRaw that has been entered by user
                 return View(viewModel);
             }
         }
@@ -367,6 +405,18 @@ namespace InventoryManagement.Web.Controllers
                 _logger.LogError(ex, "Error checking SKU availability: {SKU}", sku);
                 return Json(new { available = false, error = "An error occurred" });
             }
+        }
+
+        private decimal ParseDecimal(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            var cleaned = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray());
+            var normalized = cleaned.Replace(".", ",");
+            if (decimal.TryParse(normalized, NumberStyles.Any, new CultureInfo("id-ID"), out var result))
+                return result;
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out result))
+                return result;
+            return 0;
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using InventoryManagement.Application.DTOs.Category;
 using InventoryManagement.Application.DTOs.Product;
+using System.ComponentModel;
 
 namespace InventoryManagement.Web.ViewModels.Product
 {
@@ -17,5 +18,8 @@ namespace InventoryManagement.Web.ViewModels.Product
         /// Gets or sets the list of categories for dropdown.
         /// </summary>
         public IEnumerable<CategoryResponseDto> Categories { get; set; } = new List<CategoryResponseDto>();
+
+        [DisplayName("Unit Price")]
+        public string? PriceRaw { get; set; }
     }
 }

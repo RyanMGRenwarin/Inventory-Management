@@ -5,6 +5,7 @@ using InventoryManagement.Web.Filters;
 using InventoryManagement.Web.ViewModels.Transaction;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
 
 namespace InventoryManagement.Web.Controllers
 {
@@ -122,26 +123,48 @@ namespace InventoryManagement.Web.Controllers
         [Authorize(Roles = "User,Admin")]
         [ServiceFilter(typeof(ValidationActionFilter))]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(TransactionCreateDto createDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> Create(
+            [FromForm] TransactionCreateViewModel viewModel, 
+            CancellationToken cancellationToken = default)
         {
+            // Remove default error binding
+            ModelState.Remove("Transaction.UnitPrice");
+
+            // Get the raw unit price from the form and assign it to the view model
+            var unitPriceRaw = Request.Form["UnitPriceRaw"].ToString();
+            viewModel.UnitPriceRaw = unitPriceRaw;
+
+            // Validate the unit price
+            if (string.IsNullOrWhiteSpace(unitPriceRaw))
+            {
+                ModelState.AddModelError("UnitPriceRaw", "Unit price is required");
+            }
+            else
+            {
+                viewModel.Transaction.UnitPrice = ParseDecimal(unitPriceRaw);
+
+                if (viewModel.Transaction.UnitPrice < 0.01m || viewModel.Transaction.UnitPrice > 999999.99m)
+                {
+                    ModelState.AddModelError("UnitPriceRaw", "Unit price must be between 0.01 and 999,999.99");
+                }
+            }
+
+            // Quantity Validation
+            if (viewModel.Transaction.Quantity < 1)
+            {
+                ModelState.AddModelError("Transaction.Quantity", "Quantity must be at least 1");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                // Reload dropdowns and return to view
+                viewModel.Products = await _productService.GetAllProductsAsync(cancellationToken);
+                viewModel.Warehouses = await _warehouseService.GetAvailableWarehousesAsync(cancellationToken);
+                return View(viewModel);
+            }
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    var products = await _productService.GetAllProductsAsync(cancellationToken);
-                    var warehouses = await _warehouseService.GetAvailableWarehousesAsync(cancellationToken);
-                    var viewModel = new TransactionCreateViewModel
-                    {
-                        Title = "Create Transaction",
-                        Transaction = createDto,
-                        Products = products,
-                        Warehouses = warehouses,
-                        IsAuthenticated = true,
-                        UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value
-                    };
-                    return View(viewModel);
-                }
-
                 // Get user ID from claims
                 var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier);
                 if (!int.TryParse(userIdClaim?.Value, out int userId))
@@ -149,33 +172,34 @@ namespace InventoryManagement.Web.Controllers
                     throw new InvalidOperationException("User ID not found.");
                 }
 
+                var createDto = new TransactionCreateDto
+                {
+                    ProductId = viewModel.Transaction.ProductId,
+                    WarehouseId = viewModel.Transaction.WarehouseId,
+                    Type = viewModel.Transaction.Type,
+                    Quantity = viewModel.Transaction.Quantity,
+                    UnitPrice = viewModel.Transaction.UnitPrice,
+                    Notes = viewModel.Transaction.Notes
+                };
+
                 var transaction = await _transactionService.CreateTransactionAsync(createDto, userId, cancellationToken);
                 TempData["SuccessMessage"] = $"Transaction created successfully. {transaction.Quantity}x {transaction.ProductName} {transaction.TypeDisplayName}.";
                 return RedirectToAction(nameof(Index));
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Validation error creating transaction");
                 ModelState.AddModelError(string.Empty, ex.Message);
-
-                var products = await _productService.GetAllProductsAsync(cancellationToken);
-                var warehouses = await _warehouseService.GetAvailableWarehousesAsync(cancellationToken);
-                var viewModel = new TransactionCreateViewModel
-                {
-                    Title = "Create Transaction",
-                    Transaction = createDto,
-                    Products = products,
-                    Warehouses = warehouses,
-                    IsAuthenticated = true,
-                    UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value
-                };
+                viewModel.Products = await _productService.GetAllProductsAsync(cancellationToken);
+                viewModel.Warehouses = await _warehouseService.GetAvailableWarehousesAsync(cancellationToken);
                 return View(viewModel);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating transaction");
-                TempData["ErrorMessage"] = "An error occurred while creating the transaction.";
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(string.Empty, "An error occurred while creating the transaction.");
+                viewModel.Products = await _productService.GetAllProductsAsync(cancellationToken);
+                viewModel.Warehouses = await _warehouseService.GetAvailableWarehousesAsync(cancellationToken);
+                return View(viewModel);
             }
         }
 
@@ -210,6 +234,19 @@ namespace InventoryManagement.Web.Controllers
                 TempData["ErrorMessage"] = "An error occurred while deleting the transaction.";
                 return RedirectToAction(nameof(Index));
             }
+        }
+
+        // Helper Parser Decimal
+        private decimal ParseDecimal(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            var cleaned = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray());
+            var normalized = cleaned.Replace(".", ",");
+            if (decimal.TryParse(normalized, NumberStyles.Any, new CultureInfo("id-ID"), out var result))
+                return result;
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out result))
+                return result;
+            return 0;
         }
     }
 }

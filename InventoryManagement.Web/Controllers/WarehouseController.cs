@@ -85,7 +85,7 @@ namespace InventoryManagement.Web.Controllers
         /// <summary>
         /// Handles warehouse creation.
         /// </summary>
-        /// <param name="createDto">Warehouse creation data.</param>
+        /// <param name="viewModel">The warehouse creation view model containing the warehouse data.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Redirect to warehouse list on success, or returns to form on error.</returns>
         [HttpPost]
@@ -93,21 +93,21 @@ namespace InventoryManagement.Web.Controllers
         [AuthorizeRole(UserRole.Admin)]
         [ServiceFilter(typeof(ValidationActionFilter))]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(WarehouseCreateDto createDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> Create(WarehouseCreateViewModel viewModel, CancellationToken cancellationToken = default)
         {
+            if (!ModelState.IsValid)
+            {
+                return View(viewModel);
+            }
+
             try
             {
-                if (!ModelState.IsValid)
+                var createDto = new WarehouseCreateDto
                 {
-                    var viewModel = new WarehouseCreateViewModel
-                    {
-                        Title = "Create Warehouse",
-                        Warehouse = createDto,
-                        IsAuthenticated = true,
-                        UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value
-                    };
-                    return View(viewModel);
-                }
+                    Name = viewModel.Warehouse.Name,
+                    Location = viewModel.Warehouse.Location,
+                    Capacity = viewModel.Warehouse.Capacity
+                };
 
                 var warehouse = await _warehouseService.CreateWarehouseAsync(createDto, cancellationToken);
                 TempData["SuccessMessage"] = $"Warehouse '{warehouse.Name}' created successfully.";
@@ -169,7 +169,7 @@ namespace InventoryManagement.Web.Controllers
         /// Handles warehouse update.
         /// </summary>
         /// <param name="id">Warehouse ID.</param>
-        /// <param name="updateDto">Warehouse update data.</param>
+        /// <param name="viewModel">The warehouse edit view model containing the updated warehouse data.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Redirect to warehouse list on success, or returns to form on error.</returns>
         [HttpPost]
@@ -177,22 +177,21 @@ namespace InventoryManagement.Web.Controllers
         [AuthorizeRole(UserRole.Admin)]
         [ServiceFilter(typeof(ValidationActionFilter))]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, WarehouseCreateDto updateDto, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> Edit(int id, WarehouseEditViewModel viewModel, CancellationToken cancellationToken = default)
         {
+            if (!ModelState.IsValid)
+            {
+                return View(viewModel);
+            }
+
             try
             {
-                if (!ModelState.IsValid)
+                var updateDto = new WarehouseCreateDto
                 {
-                    var viewModel = new WarehouseEditViewModel
-                    {
-                        Title = "Edit Warehouse",
-                        Warehouse = updateDto,
-                        WarehouseId = id,
-                        IsAuthenticated = true,
-                        UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value
-                    };
-                    return View(viewModel);
-                }
+                    Name = viewModel.Warehouse.Name,
+                    Location = viewModel.Warehouse.Location,
+                    Capacity = viewModel.Warehouse.Capacity
+                };
 
                 var warehouse = await _warehouseService.UpdateWarehouseAsync(id, updateDto, cancellationToken);
                 TempData["SuccessMessage"] = $"Warehouse '{warehouse.Name}' updated successfully.";

@@ -9,7 +9,9 @@ using InventoryManagement.Infrastructure.Repositories;
 using InventoryManagement.Infrastructure.Services;
 using InventoryManagement.Infrastructure.UnitOfWork;
 using InventoryManagement.Web.Filters;
+using InventoryManagement.Web.ModelBinders;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -28,13 +30,6 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-
-        var culture = new CultureInfo("id-ID");
-        culture.NumberFormat.NumberDecimalSeparator = ",";
-        culture.NumberFormat.NumberGroupSeparator = ".";
-
-        CultureInfo.DefaultThreadCurrentCulture = culture;
-        CultureInfo.DefaultThreadCurrentUICulture = culture;
 
         // Configure Serilog
         builder.Host.UseSerilog((context, config) =>

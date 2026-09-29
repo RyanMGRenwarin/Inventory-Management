@@ -43,7 +43,6 @@ namespace InventoryManagement.Application.DTOs.Product
         /// Gets or sets the unit price.
         /// </summary>
         [Required(ErrorMessage = "Price is required")]
-        [PriceRange(0.01, 999999.99, ErrorMessage = "Price must be between 0.01 and 999,999.99")]
         [DataType(DataType.Currency)]
         [DisplayFormat(DataFormatString = "{0:F2}", ApplyFormatInEditMode = true)]
         [DisplayName("Unit Price")]

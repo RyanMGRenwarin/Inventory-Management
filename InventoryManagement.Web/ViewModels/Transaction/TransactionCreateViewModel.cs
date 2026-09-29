@@ -1,6 +1,7 @@
 ﻿using InventoryManagement.Application.DTOs.Product;
 using InventoryManagement.Application.DTOs.Transaction;
 using InventoryManagement.Application.DTOs.Warehouse;
+using System.ComponentModel;
 
 namespace InventoryManagement.Web.ViewModels.Transaction
 {
@@ -23,5 +24,8 @@ namespace InventoryManagement.Web.ViewModels.Transaction
         /// Gets or sets the list of warehouses for dropdown.
         /// </summary>
         public IEnumerable<WarehouseResponseDto> Warehouses { get; set; } = [];
+
+        [DisplayName("Unit Price")]
+        public string? UnitPriceRaw { get; set; }
     }
 }
