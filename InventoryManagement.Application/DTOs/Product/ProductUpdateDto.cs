@@ -1,5 +1,4 @@
-﻿using InventoryManagement.Application.Validators;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
 namespace InventoryManagement.Application.DTOs.Product
