@@ -2,6 +2,7 @@
 using InventoryManagement.Domain.Entities;
 using InventoryManagement.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace InventoryManagement.Infrastructure.Repositories
 {
@@ -17,6 +18,36 @@ namespace InventoryManagement.Infrastructure.Repositories
         public ProductRepository(AppDbContext context)
             : base(context)
         {
+        }
+
+        public override async Task<(IEnumerable<Product> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            Expression<Func<Product, bool>>? predicate = null,
+            Func<IQueryable<Product>, IOrderedQueryable<Product>>? orderBy = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (pageNumber < 1)
+                throw new ArgumentException("Page number must be greater than 0", nameof(pageNumber));
+
+            if (pageSize < 1)
+                throw new ArgumentException("Page size must be greater than 0", nameof(pageSize));
+
+            // Include Category
+            IQueryable<Product> query = _dbSet.Include(p => p.Category);
+
+            if (predicate != null) query = query.Where(predicate);
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            if (orderBy != null) query = orderBy(query);
+
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
         }
 
         /// <inheritdoc/>

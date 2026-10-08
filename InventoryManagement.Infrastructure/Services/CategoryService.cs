@@ -26,13 +26,15 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<CategoryResponseDto>> GetCategoriesAsync(CategoryFilterDto filter, 
+        public async Task<IEnumerable<CategoryResponseDto>> GetCategoriesAsync(CategoryFilterDto filter,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogDebug("Retrieving categories: SearchTerm={SearchTerm}", filter.SearchTerm);
+
                 var categoriesWithCounts = await _unitOfWork.Categories.GetCategoriesWithProductCountsAsync(
-                    cancellationToken = default);
+                    cancellationToken);
 
                 var searchTerm = string.IsNullOrWhiteSpace(filter.SearchTerm) ? null : filter.SearchTerm.ToLower();
                 var result = categoriesWithCounts
@@ -46,7 +48,11 @@ namespace InventoryManagement.Infrastructure.Services
                         ProductCount = t.ProductCount,
                         CreatedAt = t.Category.CreatedAt
                     })
-                    .OrderBy(c => c.Name);
+                    .OrderBy(c => c.Name)
+                    .ToList();
+
+                _logger.LogInformation("Categories retrieved successfully: Count={Count}, SearchTerm={SearchTerm}",
+                    result.Count, filter.SearchTerm);
 
                 return result;
             }
@@ -58,18 +64,23 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<CategoryResponseDto?> GetCategoryByIdAsync(int id, 
+        public async Task<CategoryResponseDto?> GetCategoryByIdAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
                 var category = await _unitOfWork.Categories.GetByIdAsync(id, cancellationToken);
+
                 if (category == null)
                 {
+                    _logger.LogWarning("Category not found: CategoryId={CategoryId}", id);
                     return null;
                 }
 
                 var productCount = await _unitOfWork.Products.CountAsync(p => p.CategoryId == id, cancellationToken);
+
+                _logger.LogDebug("Category retrieved: CategoryId={CategoryId}, Name={CategoryName}, ProductCount={ProductCount}",
+                    category.Id, category.Name, productCount);
 
                 return new CategoryResponseDto
                 {
@@ -88,14 +99,17 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto createDto, 
+        public async Task<CategoryResponseDto> CreateCategoryAsync(CategoryCreateDto createDto,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Creating category: Name={CategoryName}", createDto.Name);
+
                 // Check if category name already exists
                 if (await _unitOfWork.Categories.NameExistsAsync(createDto.Name, null, cancellationToken))
                 {
+                    _logger.LogWarning("Category creation failed: Duplicate name. Name={CategoryName}", createDto.Name);
                     throw new InvalidOperationException($"Category name '{createDto.Name}' already exists.");
                 }
 
@@ -109,7 +123,8 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Categories.AddAsync(category, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Category created successfully: {CategoryName}", category.Name);
+                _logger.LogInformation("Category created successfully: CategoryId={CategoryId}, Name={CategoryName}",
+                    category.Id, category.Name);
 
                 return new CategoryResponseDto
                 {
@@ -128,20 +143,26 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<CategoryResponseDto> UpdateCategoryAsync(int id, CategoryCreateDto updateDto, 
+        public async Task<CategoryResponseDto> UpdateCategoryAsync(int id, CategoryCreateDto updateDto,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Updating category: CategoryId={CategoryId}, Name={CategoryName}",
+                    id, updateDto.Name);
+
                 var category = await _unitOfWork.Categories.GetByIdAsync(id, cancellationToken);
                 if (category == null)
                 {
+                    _logger.LogWarning("Category update failed: Category not found. CategoryId={CategoryId}", id);
                     throw new InvalidOperationException($"Category with ID {id} does not exist.");
                 }
 
                 // Check if category name already exists (excluding current)
                 if (await _unitOfWork.Categories.NameExistsAsync(updateDto.Name, id, cancellationToken))
                 {
+                    _logger.LogWarning("Category update failed: Duplicate name. Name={CategoryName}, ExcludeCategoryId={CategoryId}",
+                        updateDto.Name, id);
                     throw new InvalidOperationException($"Category name '{updateDto.Name}' already exists.");
                 }
 
@@ -154,7 +175,8 @@ namespace InventoryManagement.Infrastructure.Services
 
                 var productCount = await _unitOfWork.Products.CountAsync(p => p.CategoryId == id, cancellationToken);
 
-                _logger.LogInformation("Category updated successfully: {CategoryName} (ID: {CategoryId})", category.Name, category.Id);
+                _logger.LogInformation("Category updated successfully: CategoryId={CategoryId}, Name={CategoryName}, ProductCount={ProductCount}",
+                    category.Id, category.Name, productCount);
 
                 return new CategoryResponseDto
                 {
@@ -167,21 +189,23 @@ namespace InventoryManagement.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating category: {CategoryId}", id);
+                _logger.LogError(ex, "Error updating category: CategoryId={CategoryId}", id);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> DeleteCategoryAsync(int id, 
+        public async Task<bool> DeleteCategoryAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Deleting category: CategoryId={CategoryId}", id);
+
                 var category = await _unitOfWork.Categories.GetByIdAsync(id, cancellationToken);
                 if (category == null)
                 {
-                    _logger.LogWarning("Category not found for deletion: {CategoryId}", id);
+                    _logger.LogWarning("Category deletion failed: Category not found. CategoryId={CategoryId}", id);
                     return false;
                 }
 
@@ -189,18 +213,21 @@ namespace InventoryManagement.Infrastructure.Services
                 var hasProducts = await _unitOfWork.Products.AnyAsync(p => p.CategoryId == id, cancellationToken);
                 if (hasProducts)
                 {
+                    _logger.LogWarning("Category deletion failed: Category has existing products. CategoryId={CategoryId}, Name={CategoryName}",
+                        id, category.Name);
                     throw new InvalidOperationException("Cannot delete category with existing products.");
                 }
 
                 await _unitOfWork.Categories.DeleteByIdAsync(id, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Category deleted successfully: {CategoryId}", id);
+                _logger.LogInformation("Category deleted successfully: CategoryId={CategoryId}, Name={CategoryName}",
+                    id, category.Name);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting category: {CategoryId}", id);
+                _logger.LogError(ex, "Error deleting category: CategoryId={CategoryId}", id);
                 throw;
             }
         }
@@ -211,7 +238,8 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var categoriesWithCounts = await _unitOfWork.Categories.GetCategoriesWithProductCountsAsync(cancellationToken);
-                return categoriesWithCounts
+
+                var result = categoriesWithCounts
                     .Select(t => new CategoryResponseDto
                     {
                         Id = t.Category.Id,
@@ -220,7 +248,12 @@ namespace InventoryManagement.Infrastructure.Services
                         ProductCount = t.ProductCount,
                         CreatedAt = t.Category.CreatedAt
                     })
-                    .OrderBy(c => c.Name);
+                    .OrderBy(c => c.Name)
+                    .ToList();
+
+                _logger.LogDebug("All categories retrieved: Count={Count}", result.Count);
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -230,13 +263,18 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<bool> IsCategoryNameAvailableAsync(string name, 
-            int? excludeCategoryId, 
+        public async Task<bool> IsCategoryNameAvailableAsync(string name,
+            int? excludeCategoryId,
             CancellationToken cancellationToken = default)
         {
             try
             {
-                return !await _unitOfWork.Categories.NameExistsAsync(name, excludeCategoryId, cancellationToken);
+                var isAvailable = !await _unitOfWork.Categories.NameExistsAsync(name, excludeCategoryId, cancellationToken);
+
+                _logger.LogDebug("Category name availability checked: Name={Name}, ExcludeCategoryId={ExcludeCategoryId}, IsAvailable={IsAvailable}",
+                    name, excludeCategoryId, isAvailable);
+
+                return isAvailable;
             }
             catch (Exception ex)
             {

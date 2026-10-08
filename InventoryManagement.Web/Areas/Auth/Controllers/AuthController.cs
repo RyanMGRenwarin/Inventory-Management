@@ -284,7 +284,7 @@ namespace InventoryManagement.Web.Areas.Auth.Controllers
                 _logger.LogError(ex, "Error during logout");
             }
 
-            return RedirectToAction("Index", "Home", new { area = "" });
+            return RedirectToAction("Login", "Auth", new { area = "Auth" });
         }
 
         /// <summary>

@@ -42,6 +42,7 @@ namespace InventoryManagement.Web.Controllers
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Product list view.</returns>
         [HttpGet]
+        [Route("")]
         [Route("Index")]
         public async Task<IActionResult> Index([FromQuery] ProductFilterDto filter, CancellationToken cancellationToken = default)
         {
@@ -221,7 +222,7 @@ namespace InventoryManagement.Web.Controllers
                         CategoryId = product.CategoryId
                     },
                     // Fill PriceRaw with format that can be parsed (dot)
-                    PriceRaw = product.Price.ToString(CultureInfo.InvariantCulture),
+                    PriceRaw = product.Price.ToString("F2", CultureInfo.InvariantCulture),
                     Categories = categories,
                     IsAuthenticated = true,
                     UserRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value

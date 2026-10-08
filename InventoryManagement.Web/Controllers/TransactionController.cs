@@ -47,6 +47,7 @@ namespace InventoryManagement.Web.Controllers
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Transaction list view.</returns>
         [HttpGet]
+        [Route("")]
         [Route("Index")]
         public async Task<IActionResult> Index([FromQuery] TransactionFilterDto filter, 
             CancellationToken cancellationToken = default)

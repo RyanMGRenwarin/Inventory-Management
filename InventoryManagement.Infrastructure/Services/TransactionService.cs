@@ -28,11 +28,14 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<TransactionListResponseDto> GetTransactionsAsync(TransactionFilterDto filter, 
+        public async Task<TransactionListResponseDto> GetTransactionsAsync(TransactionFilterDto filter,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogDebug("Retrieving transactions: PageNumber={PageNumber}, PageSize={PageSize}, ProductId={ProductId}, WarehouseId={WarehouseId}, Type={Type}, StartDate={StartDate}, EndDate={EndDate}",
+                    filter.PageNumber, filter.PageSize, filter.ProductId, filter.WarehouseId, filter.Type, filter.StartDate, filter.EndDate);
+
                 Expression<Func<InventoryTransaction, bool>>? predicate = null;
 
                 if (filter.ProductId.HasValue)
@@ -79,7 +82,10 @@ namespace InventoryManagement.Infrastructure.Services
                     q => q.OrderByDescending(t => t.TransactionDate),
                     cancellationToken);
 
-                var transactionDtos = transactions.Select(MapToResponseDto);
+                var transactionDtos = transactions.Select(MapToResponseDto).ToList();
+
+                _logger.LogInformation("Transactions retrieved successfully: TotalCount={TotalCount}, ReturnedCount={ReturnedCount}, PageNumber={PageNumber}, PageSize={PageSize}",
+                    totalCount, transactionDtos.Count, filter.PageNumber, filter.PageSize);
 
                 return new TransactionListResponseDto
                 {
@@ -98,13 +104,23 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<TransactionResponseDto?> GetTransactionByIdAsync(int id, 
+        public async Task<TransactionResponseDto?> GetTransactionByIdAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
                 var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken);
-                return transaction != null ? MapToResponseDto(transaction) : null;
+
+                if (transaction == null)
+                {
+                    _logger.LogWarning("Transaction not found: TransactionId={TransactionId}", id);
+                    return null;
+                }
+
+                _logger.LogDebug("Transaction retrieved: TransactionId={TransactionId}, Type={Type}, Quantity={Quantity}",
+                    transaction.Id, transaction.Type, transaction.Quantity);
+
+                return MapToResponseDto(transaction);
             }
             catch (Exception ex)
             {
@@ -114,16 +130,20 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<TransactionResponseDto> CreateTransactionAsync(TransactionCreateDto createDto, 
-            int userId, 
+        public async Task<TransactionResponseDto> CreateTransactionAsync(TransactionCreateDto createDto,
+            int userId,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Creating transaction: ProductId={ProductId}, WarehouseId={WarehouseId}, Type={Type}, Quantity={Quantity}, UnitPrice={UnitPrice}, UserId={UserId}",
+                    createDto.ProductId, createDto.WarehouseId, createDto.Type, createDto.Quantity, createDto.UnitPrice, userId);
+
                 // Validate product exists
                 var product = await _unitOfWork.Products.GetByIdAsync(createDto.ProductId, cancellationToken);
                 if (product == null)
                 {
+                    _logger.LogWarning("Transaction creation failed: Product not found. ProductId={ProductId}", createDto.ProductId);
                     throw new InvalidOperationException($"Product with ID {createDto.ProductId} does not exist.");
                 }
 
@@ -131,12 +151,15 @@ namespace InventoryManagement.Infrastructure.Services
                 var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(createDto.WarehouseId, cancellationToken);
                 if (warehouse == null)
                 {
+                    _logger.LogWarning("Transaction creation failed: Warehouse not found. WarehouseId={WarehouseId}", createDto.WarehouseId);
                     throw new InvalidOperationException($"Warehouse with ID {createDto.WarehouseId} does not exist.");
                 }
 
                 // Validate stock availability for outbound transactions
                 if (createDto.Type == TransactionType.Outbound && product.StockQuantity < createDto.Quantity)
                 {
+                    _logger.LogWarning("Transaction creation failed: Insufficient stock. ProductId={ProductId}, Available={Available}, Requested={Requested}",
+                        createDto.ProductId, product.StockQuantity, createDto.Quantity);
                     throw new InvalidOperationException($"Insufficient stock. Available: {product.StockQuantity}, Requested: {createDto.Quantity}");
                 }
 
@@ -146,6 +169,8 @@ namespace InventoryManagement.Infrastructure.Services
                     var newOccupancy = warehouse.CurrentOccupancy + createDto.Quantity;
                     if (newOccupancy > warehouse.Capacity)
                     {
+                        _logger.LogWarning("Transaction creation failed: Warehouse capacity exceeded. WarehouseId={WarehouseId}, Capacity={Capacity}, Current={Current}, Requested={Requested}",
+                            createDto.WarehouseId, warehouse.Capacity, warehouse.CurrentOccupancy, createDto.Quantity);
                         throw new InvalidOperationException($"Warehouse capacity exceeded. Capacity: {warehouse.Capacity}, Current: {warehouse.CurrentOccupancy}, Requested: {createDto.Quantity}");
                     }
                 }
@@ -183,13 +208,15 @@ namespace InventoryManagement.Infrastructure.Services
                         await _unitOfWork.SaveChangesAsync(cancellationToken);
                         await transaction.CommitAsync(cancellationToken);
 
-                        _logger.LogInformation("Transaction created successfully: {TransactionType} {Quantity}x {ProductName} by User {UserId}",
-                            createDto.Type, createDto.Quantity, product.Name, userId);
+                        _logger.LogInformation("Transaction created successfully: TransactionId={TransactionId}, Type={Type}, Quantity={Quantity}, ProductName={ProductName}, WarehouseName={WarehouseName}, TotalAmount={TotalAmount}, NewStock={NewStock}, UserId={UserId}",
+                            inventoryTransaction.Id, createDto.Type, createDto.Quantity, product.Name, warehouse.Name, inventoryTransaction.TotalAmount, newStock, userId);
 
                         return MapToResponseDto(inventoryTransaction);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _logger.LogWarning(ex, "Transaction creation failed, rolling back: ProductId={ProductId}, WarehouseId={WarehouseId}, Type={Type}, Quantity={Quantity}",
+                            createDto.ProductId, createDto.WarehouseId, createDto.Type, createDto.Quantity);
                         await transaction.RollbackAsync(cancellationToken);
                         throw;
                     }
@@ -203,15 +230,17 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<bool> DeleteTransactionAsync(int id, 
+        public async Task<bool> DeleteTransactionAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Deleting transaction: TransactionId={TransactionId}", id);
+
                 var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken);
                 if (transaction == null)
                 {
-                    _logger.LogWarning("Transaction not found for deletion: {TransactionId}", id);
+                    _logger.LogWarning("Transaction deletion failed: Transaction not found. TransactionId={TransactionId}", id);
                     return false;
                 }
 
@@ -239,11 +268,13 @@ namespace InventoryManagement.Infrastructure.Services
                         await _unitOfWork.SaveChangesAsync(cancellationToken);
                         await dbTransaction.CommitAsync(cancellationToken);
 
-                        _logger.LogInformation("Transaction deleted successfully: {TransactionId}", id);
+                        _logger.LogInformation("Transaction deleted successfully: TransactionId={TransactionId}, Type={Type}, Quantity={Quantity}, ProductId={ProductId}, WarehouseId={WarehouseId}",
+                            id, transaction.Type, transaction.Quantity, transaction.ProductId, transaction.WarehouseId);
                         return true;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _logger.LogWarning(ex, "Transaction deletion failed, rolling back: TransactionId={TransactionId}", id);
                         await dbTransaction.RollbackAsync(cancellationToken);
                         throw;
                     }
@@ -251,7 +282,7 @@ namespace InventoryManagement.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting transaction: {TransactionId}", id);
+                _logger.LogError(ex, "Error deleting transaction: TransactionId={TransactionId}", id);
                 throw;
             }
         }
@@ -261,6 +292,8 @@ namespace InventoryManagement.Infrastructure.Services
         {
             try
             {
+                _logger.LogDebug("Retrieving transaction summary");
+
                 var today = DateTime.UtcNow.Date;
                 var weekStart = today.AddDays(-(int)today.DayOfWeek);
                 var monthStart = new DateTime(today.Year, today.Month, 1);
@@ -275,7 +308,7 @@ namespace InventoryManagement.Infrastructure.Services
                     .Where(t => t.Type == TransactionType.Outbound)
                     .Sum(t => t.Quantity);
 
-                return new TransactionSummaryDto
+                var summary = new TransactionSummaryDto
                 {
                     TotalTransactions = allTransactions.Count(),
                     TotalInboundQuantity = totalInbound,
@@ -285,6 +318,11 @@ namespace InventoryManagement.Infrastructure.Services
                     WeekTransactions = allTransactions.Count(t => t.TransactionDate >= weekStart),
                     MonthTransactions = allTransactions.Count(t => t.TransactionDate >= monthStart)
                 };
+
+                _logger.LogDebug("Transaction summary retrieved: TotalTransactions={TotalTransactions}, TotalInbound={TotalInbound}, TotalOutbound={TotalOutbound}, TotalValue={TotalValue}",
+                    summary.TotalTransactions, summary.TotalInboundQuantity, summary.TotalOutboundQuantity, summary.TotalValue);
+
+                return summary;
             }
             catch (Exception ex)
             {

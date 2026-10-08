@@ -44,18 +44,26 @@ namespace InventoryManagement.Infrastructure.Services
         {
             try
             {
+                _logger.LogInformation(
+                    "Login attempt started: Username={Username}, IpAddress={IpAddress}",
+                    request.Username, ipAddress);
+
                 var user = await _unitOfWork.Users.GetByUsernameAsync(request.Username, cancellationToken);
 
                 if (user == null || !user.IsActive)
                 {
-                    _logger.LogWarning("Login attempt failed: User not found or inactive - {Username}", request.Username);
+                    _logger.LogWarning(
+                        "Login attempt failed: User not found or inactive. Username={Username}, IpAddress={IpAddress}",
+                        request.Username, ipAddress);
                     return null;
                 }
 
                 // Verify password
                 if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 {
-                    _logger.LogWarning("Login attempt failed: Invalid password - {Username}", request.Username);
+                    _logger.LogWarning(
+                        "Login attempt failed: Invalid password. Username={Username}, UserId={UserId}, IpAddress={IpAddress}",
+                        request.Username, user.Id, ipAddress);
                     return null;
                 }
 
@@ -82,7 +90,9 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Users.AddRefreshTokenAsync(refreshTokenEntity, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("User logged in successfully: {Username}", user.Username);
+                _logger.LogInformation(
+                    "Login successful: Username={Username}, UserId={UserId}, Role={Role}, IpAddress={IpAddress}, RefreshTokenExpiry={RefreshTokenExpiry}",
+                    user.Username, user.Id, user.Role, ipAddress, refreshTokenEntity.ExpiryDate);
 
                 return new LoginResponseDto
                 {
@@ -96,22 +106,30 @@ namespace InventoryManagement.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login for user: {Username}", request.Username);
+                _logger.LogError(ex,
+                    "Error during login: Username={Username}, IpAddress={IpAddress}",
+                    request.Username, ipAddress);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<RefreshTokenResponseDto?> RefreshTokenAsync(string refreshToken, string ipAddress, 
+        public async Task<RefreshTokenResponseDto?> RefreshTokenAsync(string refreshToken, string ipAddress,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation(
+                    "Refresh token attempt started: IpAddress={IpAddress}",
+                    ipAddress);
+
                 var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshToken, cancellationToken);
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Refresh token attempt failed: User not found");
+                    _logger.LogWarning(
+                        "Refresh token attempt failed: User not found. IpAddress={IpAddress}",
+                        ipAddress);
                     return null;
                 }
 
@@ -119,13 +137,17 @@ namespace InventoryManagement.Infrastructure.Services
 
                 if (tokenEntity == null)
                 {
-                    _logger.LogWarning("Refresh token attempt failed: Token not found or revoked");
+                    _logger.LogWarning(
+                        "Refresh token attempt failed: Token not found or revoked. UserId={UserId}, IpAddress={IpAddress}",
+                        user.Id, ipAddress);
                     return null;
                 }
 
                 if (tokenEntity.ExpiryDate < DateTime.UtcNow)
                 {
-                    _logger.LogWarning("Refresh token attempt failed: Token expired");
+                    _logger.LogWarning(
+                        "Refresh token attempt failed: Token expired. UserId={UserId}, ExpiredAt={ExpiredAt}, IpAddress={IpAddress}",
+                        user.Id, tokenEntity.ExpiryDate, ipAddress);
                     return null;
                 }
 
@@ -154,7 +176,9 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Users.UpdateAsync(user, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Refresh token rotated successfully for user: {Username}", user.Username);
+                _logger.LogInformation(
+                    "Refresh token rotated successfully: UserId={UserId}, OldTokenRevokedAt={RevokedAt}, NewTokenExpiry={NewTokenExpiry}, IpAddress={IpAddress}",
+                    user.Id, tokenEntity.RevokedAt, newTokenEntity.ExpiryDate, ipAddress);
 
                 return new RefreshTokenResponseDto
                 {
@@ -166,22 +190,30 @@ namespace InventoryManagement.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during token refresh");
+                _logger.LogError(ex,
+                    "Error during token refresh: IpAddress={IpAddress}",
+                    ipAddress);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> LogoutAsync(string refreshToken, string ipAddress, 
+        public async Task<bool> LogoutAsync(string refreshToken, string ipAddress,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation(
+                    "Logout attempt started: IpAddress={IpAddress}",
+                    ipAddress);
+
                 var user = await _unitOfWork.Users.GetUserByRefreshTokenAsync(refreshToken, cancellationToken);
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Logout attempt failed: User not found");
+                    _logger.LogWarning(
+                        "Logout attempt failed: User not found. IpAddress={IpAddress}",
+                        ipAddress);
                     return false;
                 }
 
@@ -195,35 +227,49 @@ namespace InventoryManagement.Infrastructure.Services
                     await _unitOfWork.Users.UpdateAsync(user, cancellationToken);
                     await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                    _logger.LogInformation("User logged out successfully: {Username}", user.Username);
+                    _logger.LogInformation(
+                        "Logout successful: Username={Username}, UserId={UserId}, RevokedAt={RevokedAt}, IpAddress={IpAddress}",
+                        user.Username, user.Id, tokenEntity.RevokedAt, ipAddress);
                     return true;
                 }
 
-                _logger.LogWarning("Logout attempt failed: Token not found");
+                _logger.LogWarning(
+                    "Logout attempt failed: Token not found or already revoked. UserId={UserId}, IpAddress={IpAddress}",
+                    user.Id, ipAddress);
                 return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during logout");
+                _logger.LogError(ex,
+                    "Error during logout: IpAddress={IpAddress}",
+                    ipAddress);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> RevokeAllTokensAsync(int userId, 
+        public async Task<bool> RevokeAllTokensAsync(int userId,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation(
+                    "Revoke all tokens attempt started: UserId={UserId}",
+                    userId);
+
                 var user = await _unitOfWork.Users.GetByIdAsync(userId, cancellationToken);
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Revoke all tokens failed: User not found - {UserId}", userId);
+                    _logger.LogWarning(
+                        "Revoke all tokens failed: User not found. UserId={UserId}",
+                        userId);
                     return false;
                 }
 
-                foreach (var token in user.RefreshTokens.Where(rt => !rt.IsRevoked))
+                var activeTokens = user.RefreshTokens.Where(rt => !rt.IsRevoked).ToList();
+
+                foreach (var token in activeTokens)
                 {
                     token.IsRevoked = true;
                     token.RevokedAt = DateTime.UtcNow;
@@ -232,33 +278,45 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Users.UpdateAsync(user, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("All tokens revoked for user: {UserId}", userId);
+                _logger.LogInformation(
+                    "All tokens revoked successfully: Username={Username}, UserId={UserId}, RevokedCount={RevokedCount}, RevokedAt={RevokedAt}",
+                    user.Username, user.Id, activeTokens.Count, DateTime.UtcNow);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error revoking all tokens for user: {UserId}", userId);
+                _logger.LogError(ex,
+                    "Error revoking all tokens: UserId={UserId}",
+                    userId);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> RegisterAsync(RegisterRequestDto request, 
+        public async Task<bool> RegisterAsync(RegisterRequestDto request,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation(
+                    "User registration attempt started: Username={Username}, Email={Email}",
+                    request.Username, request.Email);
+
                 // Check if username already exists
                 if (await _unitOfWork.Users.UsernameExistsAsync(request.Username, cancellationToken))
                 {
-                    _logger.LogWarning("Registration failed: Username already exists - {Username}", request.Username);
+                    _logger.LogWarning(
+                        "Registration failed: Username already exists. Username={Username}",
+                        request.Username);
                     return false;
                 }
 
                 // Check if email already exists
                 if (await _unitOfWork.Users.EmailExistsAsync(request.Email, cancellationToken))
                 {
-                    _logger.LogWarning("Registration failed: Email already exists - {Email}", request.Email);
+                    _logger.LogWarning(
+                        "Registration failed: Email already exists. Email={Email}",
+                        request.Email);
                     return false;
                 }
 
@@ -277,34 +335,46 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Users.AddAsync(user, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("User registered successfully: {Username}", user.Username);
+                _logger.LogInformation(
+                    "User registered successfully: Username={Username}, UserId={UserId}, Email={Email}, Role={Role}",
+                    user.Username, user.Id, user.Email, user.Role);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during registration for user: {Username}", request.Username);
+                _logger.LogError(ex,
+                    "Error during registration: Username={Username}, Email={Email}",
+                    request.Username, request.Email);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword, 
+        public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation(
+                    "Change password attempt started: UserId={UserId}",
+                    userId);
+
                 var user = await _unitOfWork.Users.GetByIdAsync(userId, cancellationToken);
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Change password failed: User not found - {UserId}", userId);
+                    _logger.LogWarning(
+                        "Change password failed: User not found. UserId={UserId}",
+                        userId);
                     return false;
                 }
 
                 // Verify current password
                 if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
                 {
-                    _logger.LogWarning("Change password failed: Invalid current password - {UserId}", userId);
+                    _logger.LogWarning(
+                        "Change password failed: Invalid current password. UserId={UserId}, Username={Username}",
+                        userId, user.Username);
                     return false;
                 }
 
@@ -315,12 +385,16 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Users.UpdateAsync(user, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Password changed successfully for user: {UserId}", userId);
+                _logger.LogInformation(
+                    "Password changed successfully: UserId={UserId}, Username={Username}, ChangedAt={ChangedAt}",
+                    userId, user.Username, user.UpdatedAt);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error changing password for user: {UserId}", userId);
+                _logger.LogError(ex,
+                    "Error changing password: UserId={UserId}",
+                    userId);
                 throw;
             }
         }
@@ -333,13 +407,13 @@ namespace InventoryManagement.Infrastructure.Services
         private string GenerateAccessToken(User user)
         {
             var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.GivenName, user.FullName),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
-        };
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.GivenName, user.FullName),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
+            };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

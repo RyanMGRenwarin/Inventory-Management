@@ -27,11 +27,14 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<WarehouseResponseDto>> GetWarehousesAsync(WarehouseFilterDto filter, 
+        public async Task<IEnumerable<WarehouseResponseDto>> GetWarehousesAsync(WarehouseFilterDto filter,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogDebug("Retrieving warehouses: SearchTerm={SearchTerm}, AvailableOnly={AvailableOnly}",
+                    filter.SearchTerm, filter.AvailableOnly);
+
                 Expression<Func<Warehouse, bool>>? predicate = null;
 
                 if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
@@ -50,9 +53,15 @@ namespace InventoryManagement.Infrastructure.Services
 
                 var warehouses = await _unitOfWork.Warehouses.GetAllAsync(predicate, cancellationToken);
 
-                return warehouses
+                var result = warehouses
                     .OrderBy(w => w.Name)
-                    .Select(MapToResponseDto);
+                    .Select(MapToResponseDto)
+                    .ToList();
+
+                _logger.LogInformation("Warehouses retrieved successfully: Count={Count}, SearchTerm={SearchTerm}, AvailableOnly={AvailableOnly}",
+                    result.Count, filter.SearchTerm, filter.AvailableOnly);
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -62,13 +71,23 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<WarehouseResponseDto?> GetWarehouseByIdAsync(int id, 
+        public async Task<WarehouseResponseDto?> GetWarehouseByIdAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
                 var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id, cancellationToken);
-                return warehouse != null ? MapToResponseDto(warehouse) : null;
+
+                if (warehouse == null)
+                {
+                    _logger.LogWarning("Warehouse not found: WarehouseId={WarehouseId}", id);
+                    return null;
+                }
+
+                _logger.LogDebug("Warehouse retrieved: WarehouseId={WarehouseId}, Name={WarehouseName}, Occupancy={Occupancy}/{Capacity}",
+                    warehouse.Id, warehouse.Name, warehouse.CurrentOccupancy, warehouse.Capacity);
+
+                return MapToResponseDto(warehouse);
             }
             catch (Exception ex)
             {
@@ -78,11 +97,14 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<WarehouseResponseDto> CreateWarehouseAsync(WarehouseCreateDto createDto, 
+        public async Task<WarehouseResponseDto> CreateWarehouseAsync(WarehouseCreateDto createDto,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Creating warehouse: Name={WarehouseName}, Location={Location}, Capacity={Capacity}",
+                    createDto.Name, createDto.Location, createDto.Capacity);
+
                 var warehouse = new Warehouse
                 {
                     Name = createDto.Name,
@@ -95,7 +117,9 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Warehouses.AddAsync(warehouse, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Warehouse created successfully: {WarehouseName}", warehouse.Name);
+                _logger.LogInformation("Warehouse created successfully: WarehouseId={WarehouseId}, Name={WarehouseName}",
+                    warehouse.Id, warehouse.Name);
+
                 return MapToResponseDto(warehouse);
             }
             catch (Exception ex)
@@ -106,14 +130,18 @@ namespace InventoryManagement.Infrastructure.Services
         }
 
         /// <inheritdoc/>
-        public async Task<WarehouseResponseDto> UpdateWarehouseAsync(int id, WarehouseCreateDto updateDto, 
+        public async Task<WarehouseResponseDto> UpdateWarehouseAsync(int id, WarehouseCreateDto updateDto,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Updating warehouse: WarehouseId={WarehouseId}, Name={WarehouseName}",
+                    id, updateDto.Name);
+
                 var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id, cancellationToken);
                 if (warehouse == null)
                 {
+                    _logger.LogWarning("Warehouse update failed: Warehouse not found. WarehouseId={WarehouseId}", id);
                     throw new InvalidOperationException($"Warehouse with ID {id} does not exist.");
                 }
 
@@ -125,26 +153,30 @@ namespace InventoryManagement.Infrastructure.Services
                 await _unitOfWork.Warehouses.UpdateAsync(warehouse, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Warehouse updated successfully: {WarehouseName} (ID: {WarehouseId})", warehouse.Name, warehouse.Id);
+                _logger.LogInformation("Warehouse updated successfully: WarehouseId={WarehouseId}, Name={WarehouseName}, Location={Location}, Capacity={Capacity}",
+                    warehouse.Id, warehouse.Name, warehouse.Location, warehouse.Capacity);
+
                 return MapToResponseDto(warehouse);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating warehouse: {WarehouseId}", id);
+                _logger.LogError(ex, "Error updating warehouse: WarehouseId={WarehouseId}", id);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task<bool> DeleteWarehouseAsync(int id, 
+        public async Task<bool> DeleteWarehouseAsync(int id,
             CancellationToken cancellationToken = default)
         {
             try
             {
+                _logger.LogInformation("Deleting warehouse: WarehouseId={WarehouseId}", id);
+
                 var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id, cancellationToken);
                 if (warehouse == null)
                 {
-                    _logger.LogWarning("Warehouse not found for deletion: {WarehouseId}", id);
+                    _logger.LogWarning("Warehouse deletion failed: Warehouse not found. WarehouseId={WarehouseId}", id);
                     return false;
                 }
 
@@ -152,18 +184,21 @@ namespace InventoryManagement.Infrastructure.Services
                 var hasTransactions = await _unitOfWork.Transactions.AnyAsync(t => t.WarehouseId == id, cancellationToken);
                 if (hasTransactions)
                 {
+                    _logger.LogWarning("Warehouse deletion failed: Warehouse has existing transactions. WarehouseId={WarehouseId}, Name={WarehouseName}",
+                        id, warehouse.Name);
                     throw new InvalidOperationException("Cannot delete warehouse with existing transactions.");
                 }
 
                 await _unitOfWork.Warehouses.DeleteByIdAsync(id, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-                _logger.LogInformation("Warehouse deleted successfully: {WarehouseId}", id);
+                _logger.LogInformation("Warehouse deleted successfully: WarehouseId={WarehouseId}, Name={WarehouseName}",
+                    id, warehouse.Name);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting warehouse: {WarehouseId}", id);
+                _logger.LogError(ex, "Error deleting warehouse: WarehouseId={WarehouseId}", id);
                 throw;
             }
         }
@@ -174,7 +209,15 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var warehouses = await _unitOfWork.Warehouses.GetAllAsync(null, cancellationToken);
-                return warehouses.OrderBy(w => w.Name).Select(MapToResponseDto);
+
+                var result = warehouses
+                    .OrderBy(w => w.Name)
+                    .Select(MapToResponseDto)
+                    .ToList();
+
+                _logger.LogDebug("All warehouses retrieved: Count={Count}", result.Count);
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -189,7 +232,12 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var warehouses = await _unitOfWork.Warehouses.GetAvailableWarehousesAsync(cancellationToken);
-                return warehouses.Select(MapToResponseDto);
+
+                var result = warehouses.Select(MapToResponseDto).ToList();
+
+                _logger.LogDebug("Available warehouses retrieved: Count={Count}", result.Count);
+
+                return result;
             }
             catch (Exception ex)
             {

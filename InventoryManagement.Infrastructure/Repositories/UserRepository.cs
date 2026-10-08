@@ -31,9 +31,17 @@ namespace InventoryManagement.Infrastructure.Repositories
         /// <inheritdoc/>
         public async Task<User?> GetUserWithRefreshTokensAsync(string username, CancellationToken cancellationToken = default)
         {
-            return await _dbSet
-                .Include(u => u.RefreshTokens.Where(rt => !rt.IsRevoked && !rt.IsDeleted))
+            var user = await _dbSet
                 .FirstOrDefaultAsync(u => u.Username == username && !u.IsDeleted, cancellationToken);
+
+            if (user != null)
+            {
+                user.RefreshTokens = await _context.RefreshTokens
+                    .Where(rt => rt.UserId == user.Id && !rt.IsRevoked && !rt.IsDeleted)
+                    .ToListAsync(cancellationToken);
+            }
+
+            return user;
         }
 
         /// <inheritdoc/>

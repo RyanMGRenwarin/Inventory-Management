@@ -3,6 +3,7 @@ using InventoryManagement.Domain.Entities;
 using InventoryManagement.Domain.Enums;
 using InventoryManagement.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace InventoryManagement.Infrastructure.Repositories
 {
@@ -18,6 +19,46 @@ namespace InventoryManagement.Infrastructure.Repositories
         public TransactionRepository(AppDbContext context)
             : base(context)
         {
+        }
+
+        /// <inheritdoc/>
+        public override async Task<(IEnumerable<InventoryTransaction> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            Expression<Func<InventoryTransaction, bool>>? predicate = null,
+            Func<IQueryable<InventoryTransaction>, IOrderedQueryable<InventoryTransaction>>? orderBy = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (pageNumber < 1)
+                throw new ArgumentException("Page number must be greater than 0", nameof(pageNumber));
+
+            if (pageSize < 1)
+                throw new ArgumentException("Page size must be greater than 0", nameof(pageSize));
+
+            // Include Navigation Properties
+            IQueryable<InventoryTransaction> query = _dbSet
+                .Include(t => t.Product)
+                .Include(t => t.Warehouse)
+                .Include(t => t.CreatedByUser);
+
+            if (predicate != null)
+            {
+                query = query.Where(predicate);
+            }
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            if (orderBy != null)
+            {
+                query = orderBy(query);
+            }
+
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
         }
 
         /// <inheritdoc/>

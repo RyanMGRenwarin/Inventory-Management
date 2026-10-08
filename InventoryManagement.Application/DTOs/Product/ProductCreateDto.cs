@@ -61,7 +61,8 @@ namespace InventoryManagement.Application.DTOs.Product
         /// <summary>
         /// Gets or sets the category ID.
         /// </summary>
-        [Required(ErrorMessage = "Category is required")]
+        //[Required(ErrorMessage = "Category is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "Category is required")]
         [DisplayName("Category")]
         public int CategoryId { get; set; }
     }

@@ -82,6 +82,9 @@ namespace InventoryManagement.Infrastructure.Services
 
                 var productDtos = products.Select(p => MapToResponseDto(p));
 
+                _logger.LogInformation("Products retrieved: TotalCount={TotalCount}, PageNumber={PageNumber}, PageSize={PageSize}",
+                                            totalCount, filter.PageNumber, filter.PageSize);
+
                 return new ProductListResponseDto
                 {
                     Products = productDtos,
@@ -105,7 +108,14 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(id, cancellationToken);
-                return product != null ? MapToResponseDto(product) : null;
+
+                if (product == null)
+                {
+                    _logger.LogWarning("Product not found: ProductId={ProductId}", id);
+                    return null;
+                }
+
+                return MapToResponseDto(product);
             }
             catch (Exception ex)
             {
@@ -123,6 +133,7 @@ namespace InventoryManagement.Infrastructure.Services
                 // Check if SKU already exists
                 if (await _unitOfWork.Products.SkuExistsAsync(createDto.SKU, null, cancellationToken))
                 {
+                    _logger.LogWarning("Duplicate SKU detected: {SKU}", createDto.SKU);
                     throw new InvalidOperationException($"SKU '{createDto.SKU}' already exists.");
                 }
 
@@ -130,6 +141,7 @@ namespace InventoryManagement.Infrastructure.Services
                 var category = await _unitOfWork.Categories.GetByIdAsync(createDto.CategoryId, cancellationToken);
                 if (category == null)
                 {
+                    _logger.LogWarning("Product Category with ID: {Id} does not exist.", createDto.CategoryId);
                     throw new InvalidOperationException($"Category with ID {createDto.CategoryId} does not exist.");
                 }
 
@@ -237,7 +249,11 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var products = await _unitOfWork.Products.GetAllAsync(null, cancellationToken);
-                return products.Select(MapToResponseDto);
+                var productDtos = products.Select(MapToResponseDto).ToList();
+
+                _logger.LogDebug("All products retrieved: Count={Count}", productDtos.Count);
+
+                return productDtos;
             }
             catch (Exception ex)
             {
@@ -252,7 +268,11 @@ namespace InventoryManagement.Infrastructure.Services
         {
             try
             {
-                return !await _unitOfWork.Products.SkuExistsAsync(sku, excludeProductId, cancellationToken);
+                var isAvailable = !await _unitOfWork.Products.SkuExistsAsync(sku, excludeProductId, cancellationToken);
+
+                _logger.LogDebug("SKU availability checked: SKU={SKU}, IsAvailable={IsAvailable}", sku, isAvailable);
+
+                return isAvailable;
             }
             catch (Exception ex)
             {
@@ -267,7 +287,11 @@ namespace InventoryManagement.Infrastructure.Services
             try
             {
                 var products = await _unitOfWork.Products.GetLowStockProductsAsync(cancellationToken);
-                return products.Select(MapToResponseDto);
+                var productDtos = products.Select(MapToResponseDto).ToList();
+
+                _logger.LogInformation("Low stock products retrieved: Count={Count}", productDtos.Count);
+
+                return productDtos;
             }
             catch (Exception ex)
             {

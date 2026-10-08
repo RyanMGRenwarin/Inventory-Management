@@ -3,4 +3,9 @@
   <Project Path="InventoryManagement.Domain/InventoryManagement.Domain.csproj" />
   <Project Path="InventoryManagement.Infrastructure/InventoryManagement.Infrastructure.csproj" />
   <Project Path="InventoryManagement.Web/InventoryManagement.Web.csproj" />
+  <Project Path="Tests/InventoryManagement.Application.Tests/InventoryManagement.Application.Tests.csproj" />
+  <Project Path="Tests/InventoryManagement.Domain.Tests/InventoryManagement.Domain.Tests.csproj" />
+  <Project Path="Tests/InventoryManagement.Infrastructure.Tests/InventoryManagement.Infrastructure.Tests.csproj" />
+  <Project Path="Tests/InventoryManagement.Integration.Tests/InventoryManagement.Integration.Tests.csproj" />
+  <Project Path="Tests/InventoryManagement.Web.Tests/InventoryManagement.Web.Tests.csproj" />
 </Solution>

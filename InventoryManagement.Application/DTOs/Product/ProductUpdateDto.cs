@@ -12,7 +12,7 @@ namespace InventoryManagement.Application.DTOs.Product
         /// <summary>
         /// Gets or sets the product ID.
         /// </summary>
-        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Id is required")]
         public int Id { get; set; }
 
         /// <summary>

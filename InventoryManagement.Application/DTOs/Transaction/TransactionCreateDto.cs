@@ -12,14 +12,14 @@ namespace InventoryManagement.Application.DTOs.Transaction
         /// <summary>
         /// Gets or sets the product ID.
         /// </summary>
-        [Required(ErrorMessage = "Product is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "Product is required")]
         [DisplayName("Product")]
         public int ProductId { get; set; }
 
         /// <summary>
         /// Gets or sets the warehouse ID.
         /// </summary>
-        [Required(ErrorMessage = "Warehouse is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "Warehouse is required")]
         [DisplayName("Warehouse")]
         public int WarehouseId { get; set; }
 

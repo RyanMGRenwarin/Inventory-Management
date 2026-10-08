@@ -44,7 +44,12 @@ namespace InventoryManagement.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
-        public virtual async Task<(IEnumerable<TEntity> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize, Expression<Func<TEntity, bool>>? predicate, Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy, CancellationToken cancellationToken)
+        public virtual async Task<(IEnumerable<TEntity> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            Expression<Func<TEntity, bool>>? predicate = null,
+            Func<IQueryable<TEntity>, IOrderedQueryable<TEntity>>? orderBy = null,
+            CancellationToken cancellationToken = default)
         {
             if (pageNumber < 1)
                 throw new ArgumentException("Page number must be greater than 0", nameof(pageNumber));

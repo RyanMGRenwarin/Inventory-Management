@@ -9,19 +9,18 @@ using InventoryManagement.Infrastructure.Repositories;
 using InventoryManagement.Infrastructure.Services;
 using InventoryManagement.Infrastructure.UnitOfWork;
 using InventoryManagement.Web.Filters;
-using InventoryManagement.Web.ModelBinders;
+using InventoryManagement.Web.Logging;
+using InventoryManagement.Web.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using System.Globalization;
 using System.Text.Json.Serialization;
 
 /// <summary>
 /// Main application entry point.
 /// </summary>
-public class Program
+public partial class Program
 {
     /// <summary>
     /// Application entry point.
@@ -32,17 +31,31 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Configure Serilog
-        builder.Host.UseSerilog((context, config) =>
+        builder.Host.UseSerilog((context, services, config) =>
         {
             config.ReadFrom.Configuration(context.Configuration)
+                .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
                 .Enrich.WithMachineName()
                 .Enrich.WithThreadId()
-                .WriteTo.Console()
+                .Enrich.WithProcessId()
+                .Enrich.With<UserIdEnricher>()
+                .Enrich.With<RequestIdEnricher>()
+                .WriteTo.Console(
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{RequestId}] " +
+                        " [{UserId}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.File(
                     path: "logs/log-.txt",
                     rollingInterval: RollingInterval.Day,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj} {Properties}{NewLine}{Exception}");
+                    retainedFileCountLimit: 30,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] " +
+                    "[{RequestId}] [{UserId}] [{MachineName}] {Message:lj} {Properties:j}{NewLine}{Exception}",
+                    shared: true)
+                .WriteTo.File(
+                    path: "logs/errors-.txt",
+                    rollingInterval: RollingInterval.Day,
+                    restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Error,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{RequestId}] [{UserId}] {Message:lj}{NewLine}{Exception}");
         });
 
         // Configure built-in services
@@ -62,12 +75,15 @@ public class Program
         ConfigurePipeline(app);
 
         // Initialize database
-        using (var scope = app.Services.CreateScope())
+        if (!app.Environment.IsEnvironment("Testing"))
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.Database.Migrate();
+            using (var scope = app.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                dbContext.Database.Migrate();
+            }
         }
-
+       
         app.Run();
     }
 
@@ -86,6 +102,10 @@ public class Program
             options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
                 sqlOptions => sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
+
+        // Register Serilog Enrichers
+        services.AddSingleton<UserIdEnricher>();
+        services.AddSingleton<RequestIdEnricher>();
 
         // ============================================================
         // Services Registration
@@ -306,7 +326,24 @@ public class Program
     private static void ConfigurePipeline(WebApplication app)
     {
         // Configure logging
-        app.UseSerilogRequestLogging();
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+                diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+                diagnosticContext.Set("UserAgent", httpContext.Request.Headers["User-Agent"].ToString());
+
+                if (httpContext.User?.Identity?.IsAuthenticated == true)
+                {
+                    diagnosticContext.Set("UserId", httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value!);
+                }
+            };
+        });
+
+        // Register CorrelationId middleware
+        app.UseMiddleware<CorrelationIdMiddleware>();
 
         // Configure error handling
         if (app.Environment.IsDevelopment())
@@ -356,3 +393,5 @@ public class Program
         app.MapFallbackToController("Index", "Home");
     }
 }
+
+public partial class Program { }
