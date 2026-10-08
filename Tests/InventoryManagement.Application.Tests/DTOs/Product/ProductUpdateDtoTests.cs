@@ -65,6 +65,22 @@ namespace InventoryManagement.Application.Tests.DTOs.Product
         }
 
         [Fact]
+        public void ProductUpdateDto_Should_Fail_When_CategoryId_Zero()
+        {
+            var dto = new ProductUpdateDto
+            {
+                Id = 1,
+                Name = "Test",
+                SKU = "TEST-001",
+                Price = 99.99m,
+                CategoryId = 0
+            };
+
+            var results = Validate(dto);
+            results.Should().Contain(r => r.MemberNames.Contains("CategoryId"));
+        }
+
+        [Fact]
         public void ProductUpdateDto_Should_Fail_When_SKU_Invalid_Pattern()
         {
             var dto = new ProductUpdateDto
