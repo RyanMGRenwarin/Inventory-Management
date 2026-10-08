@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InventoryManagement.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260908034202_InitialCreate")]
+    [Migration("20261008065718_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -897,7 +897,7 @@ namespace InventoryManagement.Infrastructure.Migrations
                             FullName = "System Administrator",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "$2a$11$ZY4Qy5EZ5r2U5.kFQ8z1X.N5GZ5UVMLqH.8ZQy5EZ5r2U5.kFQ8z1X",
+                            PasswordHash = "$2a$11$0hdhguLaQ/ChcFqXUnqL5u21QIVRAXRkebMZy/FBJqWMAM.V4Blcy",
                             Role = 2,
                             Username = "admin"
                         },
@@ -909,7 +909,7 @@ namespace InventoryManagement.Infrastructure.Migrations
                             FullName = "Regular User",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "$2a$11$M4Qy5EZ5r2U5.kFQ8z1X.N5GZ5UVMLqH.8ZQy5EZ5r2U5.kFQ8z1X",
+                            PasswordHash = "$2a$11$Rc0hTySIZnnB8s/PBQzZGehZk7MHm.xqGkuLHa70WoDNsA25xUise",
                             Role = 1,
                             Username = "user"
                         });

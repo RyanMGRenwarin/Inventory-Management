@@ -192,8 +192,8 @@ namespace InventoryManagement.Infrastructure.Migrations
                 columns: new[] { "Id", "CreatedAt", "Email", "FullName", "IsActive", "LastLoginDate", "PasswordHash", "Role", "UpdatedAt", "Username" },
                 values: new object[,]
                 {
-                    { 1, new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "admin@inventory.com", "System Administrator", true, null, "$2a$11$ZY4Qy5EZ5r2U5.kFQ8z1X.N5GZ5UVMLqH.8ZQy5EZ5r2U5.kFQ8z1X", 2, null, "admin" },
-                    { 2, new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "user@inventory.com", "Regular User", true, null, "$2a$11$M4Qy5EZ5r2U5.kFQ8z1X.N5GZ5UVMLqH.8ZQy5EZ5r2U5.kFQ8z1X", 1, null, "user" }
+                    { 1, new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "admin@inventory.com", "System Administrator", true, null, "$2a$11$0hdhguLaQ/ChcFqXUnqL5u21QIVRAXRkebMZy/FBJqWMAM.V4Blcy", 2, null, "admin" },
+                    { 2, new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "user@inventory.com", "Regular User", true, null, "$2a$11$Rc0hTySIZnnB8s/PBQzZGehZk7MHm.xqGkuLHa70WoDNsA25xUise", 1, null, "user" }
                 });
 
             migrationBuilder.InsertData(
