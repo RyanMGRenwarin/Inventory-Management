@@ -294,6 +294,7 @@ namespace InventoryManagement.Web.Areas.Auth.Controllers
         /// <returns>JSON with new access token.</returns>
         [HttpPost]
         [Route("RefreshToken")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken = default)
         {
             try
@@ -314,8 +315,14 @@ namespace InventoryManagement.Web.Areas.Auth.Controllers
                     return Json(new { success = false, message = "Invalid or expired refresh token." });
                 }
 
-                // Update access token in session
-                HttpContext.Session.SetString("AccessToken", response.AccessToken);
+                // Update access token in cookies
+                Response.Cookies.Append("AccessToken", response.AccessToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddMinutes(15)
+                });
 
                 // Update refresh token cookie (rotation)
                 var refreshTokenOptions = new CookieOptions
@@ -339,35 +346,6 @@ namespace InventoryManagement.Web.Areas.Auth.Controllers
                 _logger.LogError(ex, "Error refreshing token");
                 return Json(new { success = false, message = "An error occurred while refreshing token." });
             }
-        }
-
-        /// <summary>
-        /// Temporary endpoint to test BCrypt hash.
-        /// </summary>
-        /// <returns>The BCrypt hash for "Admin@123".</returns>
-        [HttpGet]
-        [AllowAnonymous]
-        public IActionResult TestHash()
-        {
-            var password = "Admin@123";
-            var hash = BCrypt.Net.BCrypt.HashPassword(password);
-
-            return Content($"Password: {password}\nHash: {hash}");
-        }
-
-
-        /// <summary>
-        /// Temporary endpoint to test BCrypt hash.
-        /// </summary>
-        /// <returns>The BCrypt hash for "User@123".</returns>
-        [HttpGet]
-        [AllowAnonymous]
-        public IActionResult TestHash2()
-        {
-            var password = "User@123";
-            var hash = BCrypt.Net.BCrypt.HashPassword(password);
-
-            return Content($"Password: {password}\nHash: {hash}");
         }
     }
 }
