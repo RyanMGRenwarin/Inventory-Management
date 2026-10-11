@@ -75,11 +75,13 @@ $(document).ready(function () {
     // ============================================================
     // 3. AJAX DELETE WITH CONFIRMATION
     // ============================================================
-    $('.ajax-delete').on('click', function (e) {
+    $('.ajax-delete').on('click', function(e) {
         e.preventDefault();
-        var url = $(this).data('url');
-        var itemName = $(this).data('name') || 'item';
-        var target = $(this).data('target');
+        var $btn = $(this);
+        var url = $btn.data('url');
+        var itemName = $btn.data('name') || 'item';
+        var target = $btn.data('target');
+        var csrfToken = $btn.closest('form').find('input[name="__RequestVerificationToken"]').val();
 
         if (!confirm('Are you sure you want to delete this ' + itemName + '? This action cannot be undone.')) {
             return;
@@ -88,17 +90,20 @@ $(document).ready(function () {
         $.ajax({
             url: url,
             type: 'POST',
-            beforeSend: function () {
+            data: {
+                __RequestVerificationToken: csrfToken
+            },
+            beforeSend: function() {
                 // Show loading
-                $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
-            }.bind(this),
-            success: function (data) {
+                $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+            },
+            success: function(data) {
                 if (target) {
                     // Reload the list
                     $.ajax({
                         url: target,
                         type: 'GET',
-                        success: function (html) {
+                        success: function(html) {
                             $(target).html(html);
                         }
                     });
@@ -107,12 +112,12 @@ $(document).ready(function () {
                 }
                 showToast('success', itemName + ' deleted successfully!');
             },
-            error: function (xhr, status, error) {
+            error: function(xhr, status, error) {
                 showToast('error', 'Failed to delete ' + itemName + ': ' + (xhr.responseJSON?.message || error));
             },
-            complete: function () {
-                $(this).prop('disabled', false).html('Delete');
-            }.bind(this)
+            complete: function() {
+                $btn.prop('disabled', false).html('Delete');
+            }
         });
     });
 
