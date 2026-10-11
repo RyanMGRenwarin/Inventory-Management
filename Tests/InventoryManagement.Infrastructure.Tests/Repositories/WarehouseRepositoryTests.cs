@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace InventoryManagement.Infrastructure.Tests.Repositories
 {
-    public class WarehouseRepositoryTests
+    public class WarehouseRepositoryTests : IDisposable
     {
         private readonly AppDbContext _context;
         private readonly WarehouseRepository _sut;
@@ -294,6 +294,11 @@ namespace InventoryManagement.Infrastructure.Tests.Repositories
         {
             _context.Database.EnsureDeleted();
             _context.Dispose();
+        }
+
+        void IDisposable.Dispose()
+        {
+            Dispose();
         }
     }
 }
