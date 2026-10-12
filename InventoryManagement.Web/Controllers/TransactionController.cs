@@ -5,7 +5,6 @@ using InventoryManagement.Web.Filters;
 using InventoryManagement.Web.ViewModels.Transaction;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Globalization;
 
 namespace InventoryManagement.Web.Controllers
 {
@@ -116,7 +115,7 @@ namespace InventoryManagement.Web.Controllers
         /// <summary>
         /// Handles transaction creation.
         /// </summary>
-        /// <param name="createDto">Transaction creation data.</param>
+        /// <param name="viewModel">Transaction creation view model.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Redirect to transaction list on success, or returns to form on error.</returns>
         [HttpPost]
@@ -125,29 +124,13 @@ namespace InventoryManagement.Web.Controllers
         [ServiceFilter(typeof(ValidationActionFilter))]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            [FromForm] TransactionCreateViewModel viewModel, 
+            TransactionCreateViewModel viewModel,
             CancellationToken cancellationToken = default)
         {
-            // Remove default error binding
-            ModelState.Remove("Transaction.UnitPrice");
-
-            // Get the raw unit price from the form and assign it to the view model
-            var unitPriceRaw = Request.Form["UnitPriceRaw"].ToString();
-            viewModel.UnitPriceRaw = unitPriceRaw;
-
-            // Validate the unit price
-            if (string.IsNullOrWhiteSpace(unitPriceRaw))
+            // Validate UnitPrice (binder already parsed to decimal)
+            if (viewModel.Transaction.UnitPrice < 0.01m || viewModel.Transaction.UnitPrice > 999999.99m)
             {
-                ModelState.AddModelError("UnitPriceRaw", "Unit price is required");
-            }
-            else
-            {
-                viewModel.Transaction.UnitPrice = ParseDecimal(unitPriceRaw);
-
-                if (viewModel.Transaction.UnitPrice < 0.01m || viewModel.Transaction.UnitPrice > 999999.99m)
-                {
-                    ModelState.AddModelError("UnitPriceRaw", "Unit price must be between 0.01 and 999,999.99");
-                }
+                ModelState.AddModelError("UnitPriceRaw", "Unit price must be between 0.01 and 999,999.99");
             }
 
             // Quantity Validation
@@ -235,19 +218,6 @@ namespace InventoryManagement.Web.Controllers
                 TempData["ErrorMessage"] = "An error occurred while deleting the transaction.";
                 return RedirectToAction(nameof(Index));
             }
-        }
-
-        // Helper Parser Decimal
-        private decimal ParseDecimal(string? value)
-        {
-            if (string.IsNullOrEmpty(value)) return 0;
-            var cleaned = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray());
-            var normalized = cleaned.Replace(".", ",");
-            if (decimal.TryParse(normalized, NumberStyles.Any, new CultureInfo("id-ID"), out var result))
-                return result;
-            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out result))
-                return result;
-            return 0;
         }
     }
 }

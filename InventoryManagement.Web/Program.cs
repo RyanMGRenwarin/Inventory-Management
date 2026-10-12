@@ -11,7 +11,9 @@ using InventoryManagement.Infrastructure.UnitOfWork;
 using InventoryManagement.Web.Filters;
 using InventoryManagement.Web.Logging;
 using InventoryManagement.Web.Middleware;
+using InventoryManagement.Web.ModelBinders;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Razor;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -158,6 +160,12 @@ public partial class Program
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
                 options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             });
+
+        // Register custom model binder provider
+        services.Configure<MvcOptions>(options =>
+        {
+            options.ModelBinderProviders.Insert(0, new TransactionModelBinderProvider());
+        });
 
         // Add authentication (JWT)
         services.AddAuthentication(options =>

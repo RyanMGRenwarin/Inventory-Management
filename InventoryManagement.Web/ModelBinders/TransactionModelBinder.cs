@@ -1,11 +1,14 @@
 ﻿using InventoryManagement.Application.DTOs.Transaction;
 using InventoryManagement.Domain.Enums;
+using InventoryManagement.Web.ViewModels.Transaction;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Globalization;
 
 namespace InventoryManagement.Web.ModelBinders
 {
     /// <summary>
-    /// Custom model binder for TransactionCreateDto to handle complex binding.
+    /// Custom model binder for TransactionCreateViewModel to handle complex binding
+    /// including decimal parsing with Indonesian culture (dot/comma).
     /// </summary>
     public class TransactionModelBinder : IModelBinder
     {
@@ -21,51 +24,98 @@ namespace InventoryManagement.Web.ModelBinders
         }
 
         /// <inheritdoc/>
-        public async Task BindModelAsync(ModelBindingContext bindingContext)
+        public Task BindModelAsync(ModelBindingContext bindingContext)
         {
             if (bindingContext == null)
                 throw new ArgumentNullException(nameof(bindingContext));
 
-            var modelName = bindingContext.ModelName;
-            var valueProviderResult = bindingContext.ValueProvider.GetValue(modelName);
-
-            if (valueProviderResult == ValueProviderResult.None)
-            {
-                bindingContext.Result = ModelBindingResult.Failed();
-                return;
-            }
-
             try
             {
-                var dto = new TransactionCreateDto();
+                var viewModel = new TransactionCreateViewModel();
 
-                // Bind properties using TryParse or direct value
-                if (int.TryParse(bindingContext.ValueProvider.GetValue($"{modelName}.ProductId").FirstValue, out int productId))
-                    dto.ProductId = productId;
+                // Bind Transaction.ProductId
+                if (int.TryParse(
+                    bindingContext.ValueProvider.GetValue("Transaction.ProductId").FirstValue,
+                    out int productId))
+                {
+                    viewModel.Transaction.ProductId = productId;
+                }
 
-                if (int.TryParse(bindingContext.ValueProvider.GetValue($"{modelName}.WarehouseId").FirstValue, out int warehouseId))
-                    dto.WarehouseId = warehouseId;
+                // Bind Transaction.WarehouseId
+                if (int.TryParse(
+                    bindingContext.ValueProvider.GetValue("Transaction.WarehouseId").FirstValue,
+                    out int warehouseId))
+                {
+                    viewModel.Transaction.WarehouseId = warehouseId;
+                }
 
-                if (int.TryParse(bindingContext.ValueProvider.GetValue($"{modelName}.Quantity").FirstValue, out int quantity))
-                    dto.Quantity = quantity;
+                // Bind Transaction.Type
+                if (Enum.TryParse<TransactionType>(
+                    bindingContext.ValueProvider.GetValue("Transaction.Type").FirstValue,
+                    out TransactionType type))
+                {
+                    viewModel.Transaction.Type = type;
+                }
 
-                if (decimal.TryParse(bindingContext.ValueProvider.GetValue($"{modelName}.UnitPrice").FirstValue, out decimal unitPrice))
-                    dto.UnitPrice = unitPrice;
+                // Bind Transaction.Quantity
+                if (int.TryParse(
+                    bindingContext.ValueProvider.GetValue("Transaction.Quantity").FirstValue,
+                    out int quantity))
+                {
+                    viewModel.Transaction.Quantity = quantity;
+                }
 
-                if (Enum.TryParse<TransactionType>(bindingContext.ValueProvider.GetValue($"{modelName}.Type").FirstValue, out TransactionType type))
-                    dto.Type = type;
+                // Bind UnitPriceRaw (string) — decimal parsing handled here
+                var unitPriceRaw = bindingContext.ValueProvider
+                    .GetValue("UnitPriceRaw").FirstValue;
+                viewModel.UnitPriceRaw = unitPriceRaw;
 
-                dto.Notes = bindingContext.ValueProvider.GetValue($"{modelName}.Notes").FirstValue ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(unitPriceRaw))
+                {
+                    viewModel.Transaction.UnitPrice = ParseDecimal(unitPriceRaw);
+                }
+
+                // Bind Transaction.Notes
+                viewModel.Transaction.Notes = bindingContext.ValueProvider
+                    .GetValue("Transaction.Notes").FirstValue ?? string.Empty;
 
                 // Set the model and mark as success
-                bindingContext.Result = ModelBindingResult.Success(dto);
-                _logger.LogDebug("Successfully bound TransactionCreateDto: {@Dto}", dto);
+                bindingContext.Result = ModelBindingResult.Success(viewModel);
+                _logger.LogDebug("Successfully bound TransactionCreateViewModel: {@ViewModel}", viewModel);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error binding TransactionCreateDto");
+                _logger.LogError(ex, "Error binding TransactionCreateViewModel");
                 bindingContext.Result = ModelBindingResult.Failed();
             }
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Parses a decimal string with support for both dot (.) and comma (,) as decimal separators.
+        /// </summary>
+        /// <param name="value">The raw string value from the form.</param>
+        /// <returns>The parsed decimal value, or 0 if parsing fails.</returns>
+        private static decimal ParseDecimal(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+
+            // Only keep digits, dot, and comma
+            var cleaned = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == ',').ToArray());
+
+            // Normalize: dot -> comma (for id-ID culture)
+            var normalized = cleaned.Replace(".", ",");
+
+            // Try parse with Indonesian culture (comma as decimal separator)
+            if (decimal.TryParse(normalized, NumberStyles.Any, new CultureInfo("id-ID"), out var result))
+                return result;
+
+            // Fallback: try parse with invariant culture (dot as decimal separator)
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out result))
+                return result;
+
+            return 0;
         }
     }
 }

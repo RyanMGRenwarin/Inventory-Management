@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.Globalization;
+//using System.Globalization;
 
 namespace InventoryManagement.Web.Filters
 {
@@ -26,11 +26,19 @@ namespace InventoryManagement.Web.Filters
             }
 
             // Binding decimal before validation
-            FixDecimalBinding(context);
+            //FixDecimalBinding(context);
 
             if (!context.ModelState.IsValid)
             {
-                _logger.LogWarning("Validation failed for {Action}", context.ActionDescriptor.DisplayName);
+                var errors = context.ModelState
+                   .Where(x => x.Value?.Errors.Count > 0)
+                   .ToDictionary(
+                       x => x.Key,
+                       x => x.Value?.Errors.Select(e => e.ErrorMessage).ToList()
+                   );
+
+                _logger.LogWarning("Validation failed for {Action}: {@Errors}",
+                    context.ActionDescriptor.DisplayName, errors);
 
                 // Return ViewModel (not ModelState)
                 var viewModel = context.ActionArguments.Values.FirstOrDefault(
@@ -52,59 +60,59 @@ namespace InventoryManagement.Web.Filters
         /// <summary>
         /// Decimal binding for Indonesia Culture (dot/comma).
         /// </summary>
-        private void FixDecimalBinding(ActionExecutingContext context)
-        {
-            var form = context.HttpContext.Request.Form;
-            var culture = new CultureInfo("id-ID");
+        //private void FixDecimalBinding(ActionExecutingContext context)
+        //{
+        //    var form = context.HttpContext.Request.Form;
+        //    var culture = new CultureInfo("id-ID");
 
-            foreach (var key in form.Keys)
-            {
-                var value = form[key].ToString();
+        //    foreach (var key in form.Keys)
+        //    {
+        //        var value = form[key].ToString();
 
-                // Check whether or not this field is decimal field (based on name or type)
-                if (IsDecimalField(key, context))
-                {
-                    var normalized = value.Replace(".", ",");
-                    if (decimal.TryParse(normalized, NumberStyles.Any, culture, out decimal result))
-                    {
-                        // Update model state parsed value
-                        context.ModelState.SetModelValue(key, value, normalized);
-                        // Update argument value
-                        UpdateArgumentValue(context, key, result);
-                    }
-                }
-            }
-        }
+        //        // Check whether or not this field is decimal field (based on name or type)
+        //        if (IsDecimalField(key, context))
+        //        {
+        //            var normalized = value.Replace(".", ",");
+        //            if (decimal.TryParse(normalized, NumberStyles.Any, culture, out decimal result))
+        //            {
+        //                // Update model state parsed value
+        //                context.ModelState.SetModelValue(key, value, normalized);
+        //                // Update argument value
+        //                UpdateArgumentValue(context, key, result);
+        //            }
+        //        }
+        //    }
+        //}
 
-        private bool IsDecimalField(string key, ActionExecutingContext context)
-        {
-            // Check whether or not this field is decimal field (based on name or type)
-            var modelState = context.ModelState[key];
-            if (modelState != null)
-            {
-                var rawValue = modelState.RawValue;
-                if (rawValue != null && rawValue.GetType() == typeof(decimal))
-                    return true;
-            }
+        //private bool IsDecimalField(string key, ActionExecutingContext context)
+        //{
+        //    // Check whether or not this field is decimal field (based on name or type)
+        //    var modelState = context.ModelState[key];
+        //    if (modelState != null)
+        //    {
+        //        var rawValue = modelState.RawValue;
+        //        if (rawValue != null && rawValue.GetType() == typeof(decimal))
+        //            return true;
+        //    }
 
-            // Or based on field name (example: "Price", "UnitPrice", dll)
-            var lowerKey = key.ToLower();
-            return lowerKey.Contains("price") || lowerKey.Contains("amount") || lowerKey.Contains("total");
-        }
+        //    // Or based on field name (example: "Price", "UnitPrice", dll)
+        //    var lowerKey = key.ToLower();
+        //    return lowerKey.Contains("price") || lowerKey.Contains("amount") || lowerKey.Contains("total");
+        //}
 
-        private void UpdateArgumentValue(ActionExecutingContext context, string key, decimal value)
-        {
-            // Search argument that has property with key name
-            foreach (var arg in context.ActionArguments.Values)
-            {
-                if (arg == null) continue;
+        //private void UpdateArgumentValue(ActionExecutingContext context, string key, decimal value)
+        //{
+        //    // Search argument that has property with key name
+        //    foreach (var arg in context.ActionArguments.Values)
+        //    {
+        //        if (arg == null) continue;
 
-                var prop = arg.GetType().GetProperty(key);
-                if (prop != null && prop.PropertyType == typeof(decimal))
-                {
-                    prop.SetValue(arg, value);
-                }
-            }
-        }
+        //        var prop = arg.GetType().GetProperty(key);
+        //        if (prop != null && prop.PropertyType == typeof(decimal))
+        //        {
+        //            prop.SetValue(arg, value);
+        //        }
+        //    }
+        //}
     }
 }
